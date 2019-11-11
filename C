@@ -1,0 +1,257 @@
+（1）发送端主程序初始化代码：
+	u8 t=0;			    
+	u8 HC_SR501=0;
+	u8 touch=0; 
+	 u8 song=0;
+	u16 adcx;
+	  float distance;
+	short temperature;   
+	delay_init();	    	 //	  
+	 
+	uart_init(115200);	 	//
+	 Ultran_Init();
+	LED_Init();		  		
+ 	LCD_Init();
+	Adc_Init();
+	KEY_Init();
+	fengming_Init();	
+	song_Init();
+	 
+	HC_SR501_GPIO_Init();
+	touch_Init();
+ 	POINT_COLOR=RED;//
+
+ 
+ 	while(DS18B20_Init())	//DS18B20初始化
+	{
+		LCD_ShowString(60,50,200,16,16,"DS18B20 Error");
+		delay_ms(200);
+		LCD_Fill(60,130,239,130+16,WHITE);
+ 		delay_ms(200);
+	}								   
+	LCD_ShowString(60,50,200,16,16,"DS18B20 OK");
+	POINT_COLOR=BLUE;//
+ 	LCD_ShowString(60,70,200,16,16,"Temp:   . C");	 
+		LCD_ShowString(60,90,200,16,16,"rain:      ");
+
+（2）发送端主程序循环体代码：
+if(t==0)//每1秒测量一次超声波测距距离
+		{	
+			Ultra_Ranging(&distance);
+				LCD_ShowString(60,150,200,18,16,"distance:    cm");
+		LCD_ShowxNum(125,150,distance,4,16,0);	
+			if(distance<5)
+				printf("a");
+			else if(5<distance<10)
+				printf("b");
+		}
+		
+			adcx=Get_Adc_Average(ADC_Channel_1,10);
+		
+		
+		HC_SR501=HC_SR501_StateRead();
+		touch=touch_StateRead();
+			song=song_StateRead();
+		
+		if(HC_SR501==1)
+		{
+		GPIO_SetBits(GPIOA,GPIO_Pin_5);
+			delay_ms(5000);
+				LCD_ShowString(60,110,200,16,16,"MAN");
+			printf("c");
+		}
+		else
+		{
+	  GPIO_ResetBits(GPIOA,GPIO_Pin_5);	
+				LCD_ShowString(60,110,200,16,16,"NOMAN");
+			printf("d");
+		}
+		if(adcx<1000)
+		{
+			LCD_ShowNum(60+40+8,90,adcx,4,16);	//显示正数部分
+			printf("e");
+		
+		}
+		else
+		{
+			printf("f");
+		}
+		if(song==1)
+		{
+					LED0=1;
+			
+			
+		}
+		else{
+			LED0=0;
+				delay_ms(5000);
+	
+		}	
+		if(touch==1)
+		{
+			LED1=0;
+		 printf("g");
+				LCD_ShowString(60,130,200,16,16,"touch");
+		}
+		else{
+			LED1=1;
+				 printf("h");
+				LCD_ShowString(60,130,200,16,16,"NOtouch");
+		}
+		
+   
+ 		if(t%10==0)//每100ms读取一次
+		{									  
+			temperature=DS18B20_Get_Temp();	
+			if(temperature<0)
+			{
+				LCD_ShowChar(60+40,70,'-',16,0);			//显示负号
+				temperature=-temperature;					//转为正数
+			}else LCD_ShowChar(60+40,70,' ',16,0);			//去掉负号
+			LCD_ShowNum(60+40+8,70,temperature/10,2,16);	//显示正数部分	    
+   			LCD_ShowNum(60+40+32,70,temperature%10,1,16);	//显示小数部分 		   
+		}	
+		if(temperature/10<32)
+			printf("i");
+		else
+			printf("j");
+				//POINT_COLOR=RED;//设置字体为蓝色
+				//LCD_DrawLine(60,180,160,180);							//画线
+	}
+	 	delay_ms(10);
+		HC_SR501=0;
+	}
+
+（3）接收端初始化代码
+u8 key;
+		u16 adcx;
+	 	u8 *str=0; 	
+	 	u8 *tem=0; 	
+	  	u8 *man=0;
+	 u8 *dis=0;
+	 	u8 *rain=0; 
+	 	u8 *touch=0; 
+	 float temp;
+	 float distance;
+	Adc_Init();	
+	uart_init(115200);	 //串口初始化为57600
+	delay_init();	    	 //延时函数初始化	  
+	LED_Init();		  	//初始化与LED连接的硬件接口
+	TIM1_PWM_Init(899,0);//不分频。PWM频率=72000/(899+1)=80Khz 
+	  LCD_Init();
+	 	Remote_Init();			//红外接收初始化
+  LED1=1;
+	 			POINT_COLOR=RED;//设置字体为红色 
+	LCD_ShowString(60,50,200,16,16,"Mini STM32");	
+	 LCD_ShowString(60,70,200,16,16,"SYMBOL:");	
+			//显示提示信息
+	POINT_COLOR=BLUE;//设置字体为蓝色
+
+（4）接收端循环体代码
+switch(USART_RX_BUF[0])
+		{
+			case 97:{
+				dis="danger5 ";
+				 GPIO_SetBits(GPIOC,GPIO_Pin_0); 
+				delay_ms(1000);
+				 GPIO_ResetBits(GPIOC,GPIO_Pin_0);
+			}
+				break;
+			case 98:{
+				dis="danger10";
+					 GPIO_SetBits(GPIOC,GPIO_Pin_0); 
+				delay_ms(3000);
+				 GPIO_ResetBits(GPIOC,GPIO_Pin_0);
+			}
+				break;
+				case 99:man="man       ";break;
+			case 100:man="noman      ";break;
+				case 101:rain="heavy   ";break;
+			case 102:rain="dry       ";break;
+				case 103:touch="yes       ";break;
+				case 104:touch="no       ";break;
+			
+			
+			case 105:
+				{tem="warm      ";
+			TIM_SetCompare1(TIM1,50);	}
+			
+							break;
+			case 106:{tem="hot    ";
+				TIM_SetCompare1(TIM1,800);
+				
+			}break;
+		}
+				USART_RX_STA=0;
+		key=Remote_Scan();	
+			if(key)
+		{	
+		//		LCD_ShowNum(116,130,key,3,16);		//显示键值
+			//LCD_ShowNum(116,150,RmtCnt,3,16);	//显示按键次数		 
+		switch(key)
+			{
+				case 0:str="ERROR";break;			   
+				case 162:str="POWER";break;	    
+				case 98:str="UP";break;	    
+				case 2:str="PLAY";break;		 
+				case 226:str="ALIENTEK";break;		  
+				case 194:str="RIGHT";break;	   
+				case 34:str="LEFT";break;		  
+				case 224:str="VOL-";break;		  
+				case 168:str="DOWN";break;		   
+				case 144:str="VOL+";break;		    
+				case 104:
+					     {
+								 str="1";
+								 	 LCD_ShowString(60,90,200,16,16,"distance:");	
+								 LCD_ShowString(116,90,200,16,16,dis);	//显示SYMBOL
+								 if(dis)
+								 	 GPIO_SetBits(GPIOC,GPIO_Pin_0); 
+									delay_ms(1000);
+									GPIO_ResetBits(GPIOC,GPIO_Pin_0);
+								 
+						 }
+				break;		  
+				case 152:{
+										str="2";
+					 LCD_ShowString(60,90,200,16,16,"people:     ");	
+								 LCD_ShowString(116,90,200,16,16,man);	//显示SYMBOL
+								
+								 }
+					break;	   
+				case 176:{
+					str="3";
+					LCD_ShowString(60,90,200,16,16,"tem:        ");	
+					 LCD_ShowString(116,90,200,16,16,tem);	//显示SYMBOL
+				
+				}
+				break;	    
+				case 48:
+				{
+					str="4";
+					LCD_ShowString(60,90,200,16,16,"rain:        ");	
+					 LCD_ShowString(116,90,200,16,16,rain);	//显示SYMBOL
+				}
+				break;		    
+				case 24:
+				{str="5";
+					LCD_ShowString(60,90,200,16,16,"touch:        ");	
+					 LCD_ShowString(116,90,200,16,16,touch);	//显示SYMBOL
+					
+				}
+					
+					break;		    
+				case 122:str="6";break;		  
+				case 16:str="7";break;			   					
+				case 56:str="8";break;	 
+				case 90:str="9";break;
+				case 66:str="0";break;
+				case 82:str="DELETE";break;		 
+		}				
+			LCD_Fill(116,170,116+8*8,170+16,WHITE);	//清楚之前的显示
+			LCD_ShowString(116,70,200,16,16,str);	//显示SYMBOL
+			
+		}
+			else delay_ms(10);	
+	}
+ }
